@@ -1,0 +1,15 @@
+{
+  "name": "bookleaf-portal",
+  "version": "1.0.0",
+  "description": "BookLeaf Publishing Author Support & Communication Portal",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "seed": "cd backend && npm run seed",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build"
+  },
+  "keywords": ["bookleaf", "nextjs", "express", "prisma", "ai-support", "socketio"],
+  "author": "BookLeaf Senior Full-Stack Engineering Team",
+  "license": "MIT"
+}

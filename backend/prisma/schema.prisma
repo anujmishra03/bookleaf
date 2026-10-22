@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AUTHOR
+  ADMIN
+}
+
+enum TicketCategory {
+  ROYALTY_PAYMENTS
+  ISBN_METADATA
+  PRINTING_QUALITY
+  DISTRIBUTION_AVAILABILITY
+  PRODUCTION_UPDATES
+  GENERAL_INQUIRY
+}
+
+enum TicketPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ProductionStage {
+  MANUSCRIPT_RECEIVED
+  EDITING
+  COVER_DESIGN
+  TYPESETTING
+  PROOFREADING
+  ISBN_ASSIGNMENT
+  PRINTING
+  DISTRIBUTION_SETUP
+  PUBLISHED_LIVE
+}
+
+model User {
+  id                 String          @id @default(uuid())
+  authorCode         String?         // e.g. "AUTH001"
+  email              String          @unique
+  passwordHash       String
+  name               String
+  role               Role            @default(AUTHOR)
+  phone              String?
+  city               String?         // e.g. "Mumbai", "Delhi"
+  joinedDate         DateTime?       // e.g. "2023-03-15"
+  bankAccountLinked  Boolean         @default(false)
+  bankAccountDetails String?         // JSON string: { bankName, accountNumberLast4, ifsc }
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  books              Book[]
+  tickets            Ticket[]        @relation("AuthorTickets")
+  assignedTickets    Ticket[]        @relation("AdminAssignedTickets")
+  messages           TicketMessage[]
+  auditLogs          AuditLog[]
+}
+
+model Book {
+  id                    String          @id @default(uuid())
+  bookCode              String?         // e.g. "BK001"
+  title                 String
+  isbn                  String?         @unique
+  genre                 String
+  publicationDate       DateTime?
+  status                ProductionStage @default(PUBLISHED_LIVE)
+  mrp                   Float           @default(0.0)
+  printingCost          Float           @default(0.0)
+  authorRoyaltyPerCopy  Float?          // e.g. 35, 42
+  totalCopiesSold       Int             @default(0)
+  totalRoyaltyEarned     Float           @default(0.0)
+  royaltyPaid           Float           @default(0.0)
+  royaltyPending        Float           @default(0.0)
+  lastRoyaltyPayoutDate DateTime?       // e.g. "2025-10-15"
+  printPartner          String?         // "In-House", "Repro India", "Epitome Books"
+  availableOnJson       String?         // JSON array: ["Amazon India", "Flipkart", "BookLeaf Store"]
+  platformSalesJson     String?         // Platform volume breakdown
+  
+  authorId              String
+  author                User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  tickets               Ticket[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}
+
+model Ticket {
+  id                     String          @id @default(uuid())
+  ticketNumber           String          @unique // e.g. "BL-1001"
+  subject                String
+  description            String
+  category               TicketCategory  @default(GENERAL_INQUIRY)
+  priority               TicketPriority  @default(MEDIUM)
+  status                 TicketStatus    @default(OPEN)
+  
+  aiClassified           Boolean         @default(false)
+  aiConfidence           Float?
+  aiClassificationReason String?
+  aiPriorityReason       String?
+  aiDraftResponse        String?
+  
+  authorId               String
+  author                 User            @relation("AuthorTickets", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  bookId                 String?
+  book                   Book?           @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  
+  assignedToId           String?
+  assignedTo             User?           @relation("AdminAssignedTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  attachmentsJson        String?         // JSON array of file metadata / urls
+  
+  messages               TicketMessage[]
+  auditLogs              AuditLog[]
+  
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+}
+
+model TicketMessage {
+  id              String      @id @default(uuid())
+  ticketId        String
+  ticket          Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  senderId        String
+  sender          User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  senderRole      Role
+  message         String
+  isInternalNote  Boolean     @default(false) // Only visible to Admins
+  attachmentsJson String?     // JSON array of attachments
+  
+  createdAt       DateTime    @default(now())
+}
+
+model AuditLog {
+  id             String      @id @default(uuid())
+  ticketId       String
+  ticket         Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  performedById  String?
+  performedBy    User?       @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  
+  action         String      // e.g. "STATUS_CHANGE", "PRIORITY_OVERRIDE", "AI_DRAFT_SENT", "ASSIGNED"
+  details        String?     // Context or JSON description
+  createdAt      DateTime    @default(now())
+}
